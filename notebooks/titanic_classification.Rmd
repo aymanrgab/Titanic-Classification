@@ -1,0 +1,147 @@
+---
+title: "Titanic Data Analysis and Random Forest Classification"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, }
+# Install necessary packages if not already installed
+if (!require(caret)) install.packages('caret', dependencies=TRUE)
+if (!require(randomForest)) install.packages('randomForest', dependencies=TRUE)
+if (!require(corrplot)) install.packages('corrplot', dependencies=TRUE)
+
+# Load necessary libraries
+library(ggplot2)
+library(dplyr)
+library(caret)
+library(randomForest)
+library(corrplot)
+```
+
+```{r load_data}
+# Load the dataset
+df <- read.csv('../data/titanic.csv')
+
+# Display the first few rows of the dataset
+head(df)
+```
+
+```{r preprocess_data}
+# Handle missing values
+df$Age <- ifelse(is.na(df$Age), median(df$Age, na.rm=TRUE), df$Age)
+df$Embarked <- ifelse(is.na(df$Embarked), 
+                      as.character(df %>% filter(!is.na(Embarked)) %>% count(Embarked) %>% top_n(1, n) %>% pull(Embarked)), 
+                      df$Embarked)
+df$Fare <- ifelse(is.na(df$Fare), median(df$Fare, na.rm=TRUE), df$Fare)
+
+# Drop unnecessary columns
+df <- df %>% select(-Cabin, -Ticket, -Name, -PassengerId)
+
+# Store the original dataframe to use it in visualizations
+df_original <- df
+
+# Feature Engineering: Creating a new feature for family size
+df <- df %>% mutate(FamilySize = SibSp + Parch + 1)
+
+# Encode categorical features
+df <- df %>% 
+  mutate(Sex = as.factor(Sex),
+         Embarked = as.factor(Embarked),
+         Survived = as.factor(Survived)) # Ensure Survived is a factor
+
+```
+
+```{r eda_age}
+# Age Distribution by Survival
+ggplot(df_original, aes(x = Age, fill = factor(Survived))) + 
+  geom_histogram(bins = 30, position = "dodge") + 
+  scale_fill_manual(values = c("red", "green"), labels = c("Not Survived", "Survived")) +
+  labs(title = "Age Distribution by Survival", x = "Age", y = "Count")
+
+```
+
+```{r eda_gender}
+# Survival Rate by Gender
+ggplot(df_original, aes(x = Sex, fill = factor(Survived))) + 
+  geom_bar(position = "dodge") +
+  scale_fill_manual(values = c("red", "green"), labels = c("Not Survived", "Survived")) +
+  labs(title = "Survival Rate by Gender", x = "Gender", y = "Count")
+
+```
+```{r}
+# Survival Rate by Pclass
+ggplot(df_original, aes(x = Pclass, fill = factor(Survived))) + 
+  geom_bar(position = "dodge") +
+  scale_fill_manual(values = c("red", "green"), labels = c("Not Survived", "Survived")) +
+  labs(title = "Survival Rate by Passenger Class", x = "Passenger Class", y = "Count")
+
+```
+```{r}
+# Correlation Heatmap
+df_numeric <- df %>% mutate_if(is.factor, as.numeric)
+corr <- cor(df_numeric %>% select(-Survived))
+corrplot(corr, method = "color", type = "upper", tl.col = "black", tl.srt = 45)
+
+```
+```{r}
+# Fare Distribution by Survival
+ggplot(df_original, aes(x = Fare, fill = factor(Survived))) + 
+  geom_histogram(bins = 30, position = "dodge") +
+  scale_fill_manual(values = c("red", "green"), labels = c("Not Survived", "Survived")) +
+  labs(title = "Fare Distribution by Survival", x = "Fare", y = "Count")
+
+```
+```{r}
+# Remove rows with missing values in 'Embarked'
+df <- df %>% filter(!is.na(Embarked))
+
+# Ensure 'Embarked' is a factor with correct levels
+df$Embarked <- factor(df$Embarked, levels = c("C", "Q", "S"))
+
+# Plotting Survival Rate by Port of Embarkation
+ggplot(df, aes(x = Embarked, fill = factor(Survived))) + 
+  geom_bar(position = "dodge") +
+  scale_fill_manual(values = c("red", "green"), labels = c("Not Survived", "Survived")) +
+  labs(title = "Survival Rate by Port of Embarkation", x = "Port of Embarkation", y = "Count")
+
+```
+
+```{r train_test_split}
+# Split the data into training and testing sets
+set.seed(42)
+trainIndex <- createDataPartition(df$Survived, p = 0.8, list = FALSE)
+trainData <- df[trainIndex, ]
+testData <- df[-trainIndex, ]
+
+# Scale the features
+preProcValues <- preProcess(trainData, method = c("center", "scale"))
+trainData <- predict(preProcValues, trainData)
+testData <- predict(preProcValues, testData)
+
+```
+
+```{r train_model}
+# Train the model with the best parameters found by GridSearchCV
+set.seed(42)
+best_rf <- randomForest(Survived ~ ., data = trainData, mtry = 5, ntree = 100)
+```
+
+```{r evaluate_model}
+# Predict and evaluate
+y_pred <- predict(best_rf, testData)
+
+# Ensure the predictions and actual values are factors with the same levels
+y_pred <- factor(y_pred, levels = levels(testData$Survived))
+
+# Confusion Matrix
+confusionMatrix(y_pred, testData$Survived)
+```
+
+```{r feature_importance}
+# Feature importance
+importance(best_rf)
+varImpPlot(best_rf)
+```
