@@ -44,3 +44,11 @@ The dataset used in this project is from [Kaggle's Titanic dataset](https://www.
 ## Conclusion
 
 In this project, we successfully predicted the survival of passengers on the Titanic using a Random Forest model. We explored various features and their impact on survival and performed hyperparameter tuning to improve the model's performance.
+
+## Key Findings:
+
+### Gender: Female passengers had a significantly higher survival rate than male passengers.
+### Passenger Class: Passengers in higher classes (1st and 2nd) had better chances of survival compared to those in the lower class (3rd).
+### Fare: Passengers who paid higher fares generally had higher survival rates.
+### Age: Younger passengers tended to have a slightly higher survival rate.
+### Port of Embarkation: Passengers who embarked at Cherbourg (C) had a higher survival rate compared to those who embarked at Queenstown (Q) or Southampton (S).

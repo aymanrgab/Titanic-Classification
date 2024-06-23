@@ -1,6 +1,9 @@
 ---
 title: "Titanic Data Analysis and Random Forest Classification"
-output: html_document
+output:
+  word_document: default
+  html_document: default
+  pdf_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -121,12 +124,27 @@ preProcValues <- preProcess(trainData, method = c("center", "scale"))
 trainData <- predict(preProcValues, trainData)
 testData <- predict(preProcValues, testData)
 
+# Check for missing values
+print(colSums(is.na(trainData)))
+print(colSums(is.na(testData)))
+
+# Remove any remaining rows with missing values
+trainData <- na.omit(trainData)
+testData <- na.omit(testData)
+
+# Ensure factor levels are consistent
+factor_columns <- sapply(trainData, is.factor)
+for (col in names(trainData)[factor_columns]) {
+  levels_union <- union(levels(trainData[[col]]), levels(testData[[col]]))
+  trainData[[col]] <- factor(trainData[[col]], levels = levels_union)
+  testData[[col]] <- factor(testData[[col]], levels = levels_union)
+}
 ```
 
 ```{r train_model}
 # Train the model with the best parameters found by GridSearchCV
 set.seed(42)
-best_rf <- randomForest(Survived ~ ., data = trainData, mtry = 5, ntree = 100)
+best_rf <- randomForest(Survived ~ ., data = trainData, mtry = 3, ntree = 100, na.action = na.fail)
 ```
 
 ```{r evaluate_model}
